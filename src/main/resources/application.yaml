@@ -1,3 +1,5 @@
+unsecuredEndpoints: info, health
+
 publisher:
   bootstrapServers: publisher-kafka:9092
 
@@ -9,9 +11,15 @@ publisher:
     profilesFiltered: profiles_filtered
 
 management:
-  security:
-    enabled: true
-  contextPath: /actuator
+  endpoints:
+    web:
+      exposure:
+        include: ${unsecuredEndpoints}
+
+    jmx:
+      exposure:
+        include: ${unsecuredEndpoints}
+
 
 spring:
   application:

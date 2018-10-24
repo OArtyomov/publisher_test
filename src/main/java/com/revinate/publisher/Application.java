@@ -1,4 +1,4 @@
-package com.revinate.colander;
+package com.revinate.publisher;
 
 import com.revinate.px.logging.annotations.EnableForestLogger;
 import org.springframework.boot.SpringApplication;

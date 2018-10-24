@@ -11,10 +11,14 @@ buildscript {
             }
             url "$artifactory_contextUrl/libs-release"
         }
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
     }
 
     dependencies {
         classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath "gradle.plugin.com.gorylenko.gradle-git-properties:gradle-git-properties:1.5.2"
     }
 }
 
@@ -23,6 +27,7 @@ apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
 apply plugin: 'idea'
 apply from: '_docker.gradle'
+apply plugin: "com.gorylenko.gradle-git-properties"
 
 
 sourceCompatibility = 1.8
@@ -91,6 +96,11 @@ dependencies {
     testCompile "org.assertj:assertj-core"
     componentTestCompile "org.springframework.kafka:spring-kafka-test"
     componentTestCompile 'com.revinate:assertj-json'
+}
+
+gitProperties {
+    dateFormat = "yyyy-MM-dd HH:mm:ssZ"
+    dateFormatTimeZone = 'GMT'
 }
 
 test {
