@@ -1,0 +1,15 @@
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  if which docker-machine > /dev/null; then
+    machine_name="${DOCKER_MACHINE_NAME:-dockerdev}"
+    eval $(docker-machine env $machine_name)
+    export DOCKER_HOST_IP=$(docker-machine ip $machine_name)
+  elif which boot2docker > /dev/null; then
+    eval $(boot2docker shellinit 2>/dev/null)
+    export DOCKER_HOST_IP=$(boot2docker ip)
+  fi
+fi
+
+export DOCKER_HOST_IP=${DOCKER_HOST_IP:-localhost}
+
+echo Using Docker Host IP $DOCKER_HOST_IP
+

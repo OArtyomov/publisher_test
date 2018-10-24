@@ -1,0 +1,30 @@
+publisher:
+  bootstrapServers: publisher-kafka:9092
+
+  topics:
+    blacklist: profile_blacklist
+    reservations: reservations
+    reservationsFiltered: reservations_filtered
+    profiles: profiles
+    profilesFiltered: profiles_filtered
+
+management:
+  security:
+    enabled: true
+  contextPath: /actuator
+
+spring:
+  application:
+    name: publisher
+
+logging:
+  level:
+    com:
+      revinate:
+        publisher: INFO
+
+forest:
+  logging:
+    destinations: publisher-elk:9401
+server:
+  port: 9090

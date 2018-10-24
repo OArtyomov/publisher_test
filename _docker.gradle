@@ -1,0 +1,120 @@
+buildscript {
+    repositories {
+        maven {
+            credentials {
+                username "$artifactory_user"
+                password "$artifactory_password"
+            }
+            url "$artifactory_contextUrl/libs-release"
+        }
+    }
+    dependencies {
+        classpath 'com.revinate:gradle-docker-plugin:1.6.20'
+    }
+}
+
+ext {
+    dockerNetwork = 'test-network'
+    applicationContainer = 'publisher'
+    applicationPort = 9090
+    jmxPort = 10080
+    jdwpPort = 9080
+    zookeeperImage = 'wurstmeister/zookeeper'
+    zookeeperContainer = 'publisher-zookeeper'
+    kafkaImage = 'wurstmeister/kafka:0.10.2.1'
+    kafkaContainer = 'publisher-kafka'
+    elkImage = 'registry-v2.revinate.net/common/elk:es2.0kib4'
+    elkContainer = 'publisher-elk'
+}
+
+task createNetwork(type: DockerCreateNetwork) {
+    networkName = dockerNetwork
+}
+
+task removeAllContainers(type: DockerRemoveContainer) {
+    containerIds = [
+            applicationContainer,
+            kafkaContainer,
+            zookeeperContainer,
+            elkContainer
+    ]
+}
+
+task startZookeeperContainer(type: DockerStartContainer, dependsOn: createNetwork) {
+    containerName zookeeperContainer
+    image zookeeperImage
+    connectedNetworks = dockerNetwork
+    ports = [2181: 2181]
+}
+
+task startKafkaContainer(type: DockerStartContainer, dependsOn: startZookeeperContainer) {
+    containerName kafkaContainer
+    image kafkaImage
+    connectedNetworks = dockerNetwork
+    ports = [9092: 9092]
+    environment = [
+            KAFKA_ZOOKEEPER_CONNECT: "${zookeeperContainer}:2181",
+            KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://${kafkaContainer}:9092",
+            KAFKA_CREATE_TOPICS: [
+                    'profile_blacklist:3:1',
+                    'profile_replay:1:1',
+                    'reservation_replay:1:1'
+            ].join(', ')
+    ]
+}
+
+task startElkContainer(type: DockerStartContainer) {
+    containerName elkContainer
+    image elkImage
+    connectedNetworks = dockerNetwork
+    ports = [
+            5601: 5601,
+            9200: 9200,
+            9400: '9400/udp',
+            9401: 9401,
+            9402: 9402
+    ]
+}
+
+task createApplicationContainer(type: DockerCreateImage) {
+    targetFolder = projectDir
+    tag = applicationContainer
+}
+
+task startDependencyContainers(dependsOn: [createNetwork, startElkContainer, startKafkaContainer, startZookeeperContainer])
+
+task startApplicationContainer(type: DockerStartContainer, dependsOn: [startDependencyContainers, createApplicationContainer, createNetwork]) {
+    containerName = applicationContainer
+    image = "${applicationContainer}:latest"
+    connectedNetworks = dockerNetwork
+    ports = [
+            "${applicationPort}": applicationPort,
+            "${jmxPort}": jmxPort,
+            "${jdwpPort}": jdwpPort
+    ]
+
+    environment = [
+            "SERVER_PORT": "${applicationPort}",
+            "JAVA_OPTS": "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=${jdwpPort} ",
+            "COLANDER_KAFKA_BOOTSTRAPSERVERS": "${kafkaContainer}:9092"
+    ]
+}
+
+
+task startApplication(dependsOn: startApplicationContainer) {
+    doLast {
+        try {
+            DockerUtils.waitFor([
+                    'docker', 'exec', applicationContainer, 'curl',
+                    '-s',
+                    "http://localhost:${applicationPort}/actuator/health"
+            ], 90)
+        } catch (e) {
+            logger.error('Timeout waiting for the app to start', e)
+            def proc = ['docker', 'logs', applicationContainer].execute()
+            proc.consumeProcessOutput(System.out, System.err)
+            proc.waitFor()
+            throw e;
+        }
+    }
+}
